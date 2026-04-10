@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xuyifei.jlpt.mapper.ExamQuestionResultMapper">
+
+    <insert id="batchInsert">
+        INSERT INTO exam_question_result (
+        exam_id, section_type, question_code,
+        correct_count, score_per_question, raw_score
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.examId},
+            #{item.sectionType},
+            #{item.questionCode},
+            #{item.correctCount},
+            #{item.scorePerQuestion},
+            #{item.rawScore}
+            )
+        </foreach>
+    </insert>
+    <delete id="deleteByExamId">
+        delete from exam_question_result where exam_id = #{examId}
+    </delete>
+    <select id="selectByExamId" resultType="com.xuyifei.jlpt.entity.ExamQuestionResult">
+        select *
+        from exam_question_result
+        where exam_id = #{examId}
+    </select>
+    <update id="update"
+            parameterType="com.xuyifei.jlpt.entity.ExamQuestionResult">
+
+        update exam_question_result
+        set correct_count = #{correctCount},
+            score_per_question = #{scorePerQuestion},
+            section_type = #{sectionType},
+            raw_score = #{rawScore}
+        where exam_id = #{examId}
+          and question_code = #{questionCode}
+
+    </update>
+    <select id="selectByExamIdAndQuestionCode"
+            resultType="com.xuyifei.jlpt.entity.ExamQuestionResult">
+
+        select *
+        from exam_question_result
+        where exam_id = #{examId}
+          and question_code = #{questionCode}
+
+    </select>
+
+</mapper>

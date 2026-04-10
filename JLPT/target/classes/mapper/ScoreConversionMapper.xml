@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.xuyifei.jlpt.mapper.ScoreConversionMapper">
+
+    <select id="selectScaledScore" resultType="java.lang.Integer">
+        SELECT scaled_score
+        FROM score_conversion
+        WHERE level = #{level}
+        AND section_type = #{sectionType}
+        AND raw_score = (
+        SELECT MAX(raw_score)
+        FROM score_conversion
+        WHERE level = #{level}
+        AND section_type = #{sectionType}
+        AND raw_score &lt;= #{rawScore}
+        )
+    </select>
+
+</mapper>
