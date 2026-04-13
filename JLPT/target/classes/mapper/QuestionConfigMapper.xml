@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.xuyifei.jlpt.mapper.QuestionConfigMapper">
+
+    <select id="selectAll" resultType="com.xuyifei.jlpt.entity.QuestionConfig">
+        SELECT
+        section_type,
+        question_code,
+        score_per_question
+        FROM question_config
+    </select>
+
+    <select id="sumFullScoreBySection" resultType="java.lang.Integer">
+        SELECT SUM(question_count * score_per_question)
+        FROM question_config
+        WHERE section_type = #{sectionType}
+    </select>
+
+</mapper>

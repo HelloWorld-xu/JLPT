@@ -1,39 +1,57 @@
 import { useState } from "react";
 import { upsertAnswers, calculate } from "../api";
 
+/**
+ * AnswerForm 组件：答题数据录入表单
+ * 功能：提供针对不同题型的正确题数输入，支持保存进度（Upsert）和触发后端评分计算
+ */
 function AnswerForm({ examId, setResult }) {
   
-  //题目列表
+  /**
+   * 题目列表常量
+   * L: Language Knowledge (词汇/语法)
+   * R: Reading (阅读)
+   * LS: Listening (听力)
+   */
   const QUESTION_LIST = [
     "L1","L2","L3","L4","L5","L6","L7","L8","L9",
     "R1","R2","R3","R4","R5",
     "LS1","LS2","LS3","LS4","LS5","LS6"
   ];
 
-  //初始化
-const [answers, setAnswers] = useState(
-  QUESTION_LIST.map(code => ({
-    questionCode: code,
-    correctCount: "",
-    deleted: false
-  }))
-);
+  // 初始化状态：将题号列表映射为初始答案对象数组
+  const [answers, setAnswers] = useState(
+    QUESTION_LIST.map(code => ({
+      questionCode: code,
+      correctCount: "", // 正确题目数量
+      deleted: false    // 用于前端软删除该题的输入框
+    }))
+  );
 
-  //更新输入
+  /**
+   * 更新输入框内容
+   * @param {number} index - 在 answers 数组中的索引
+   * @param {string} value - 输入的数字字符串
+   */
   const updateAnswer = (index, value) => {
     const newAnswers = [...answers];
     newAnswers[index].correctCount = value;
     setAnswers(newAnswers);
   };
 
-  //删除
+  /**
+   * 软删除某一行（不显示该题目的输入框）
+   */
   const deleteRow = (index) => {
     const newAnswers = [...answers];
     newAnswers[index].deleted = true;
     setAnswers(newAnswers);
   };
 
-  //提交
+  /**
+   * 提交答案（保存到数据库）
+   * 过滤掉已删除或未填写的项，并转换为后端需要的 DTO 格式
+   */
   const handleSubmit = async () => {
     const validAnswers = answers
       .filter(a => !a.deleted && a.correctCount !== "")
@@ -43,8 +61,8 @@ const [answers, setAnswers] = useState(
       }));
 
     try {
+      // 调用 API 执行新增或更新操作
       await upsertAnswers(examId, validAnswers);
-
       alert("提交成功");
     } catch (e) {
       console.error(e);
@@ -52,7 +70,10 @@ const [answers, setAnswers] = useState(
     }
   };
 
-  //计算
+  /**
+   * 计算成绩
+   * 触发后端执行 IRT 算法或权重转换，并将返回的结果通过 setResult 更新父组件状态
+   */
   const handleCalculate = async () => {
     try {
       const res = await calculate(examId);
@@ -62,10 +83,13 @@ const [answers, setAnswers] = useState(
     }
   };
 
-  // 显示名称（JLPT结构）
+  /**
+   * 格式化显示题号名称
+   * 将数据库简码（L1, R1...）转换为人类可读的 JLPT 试卷题号（问题1, 问题10...）
+   */
   const getDisplayName = (code) => {
 
-    // 听力
+    // 1. 处理听力 (LS)
     if (code.startsWith("LS")) {
       const num = Number(code.slice(2));
 
@@ -74,20 +98,24 @@ const [answers, setAnswers] = useState(
       if (num === 6) return "问题5（2）";
     }
 
-    // 词汇
+    // 2. 处理词汇/语法 (L)
     if (code.startsWith("L")) {
       return `问题${code.slice(1)}`;
     }
 
-    // 阅读（接在L后）
+    // 3. 处理阅读 (R) - JLPT 阅读通常接在语法题之后
     if (code.startsWith("R")) {
+      // 假设语法题到问题9结束，阅读从问题10开始
       return `问题${Number(code.slice(1)) + 9}`;
     }
 
     return code;
   };
 
-  // 分组
+  /**
+   * 逻辑分组渲染
+   * 根据题号前缀，将表单拆分为“词汇·阅读”和“听力”两个视觉区域
+   */
   const vocabReading = answers.filter(
     a => (a.questionCode.startsWith("L") && !a.questionCode.startsWith("LS")) || a.questionCode.startsWith("R")
   );
@@ -96,7 +124,9 @@ const [answers, setAnswers] = useState(
     a => a.questionCode.startsWith("LS")
   );
 
-  //  渲染行
+  /**
+   * 单行渲染函数
+   */
   const renderRow = (item) => {
     if (item.deleted) return null;
 
@@ -105,12 +135,12 @@ const [answers, setAnswers] = useState(
     return (
       <div key={item.questionCode} className="d-flex mb-3 align-items-center justify-content-center">
 
-        {/* 题号 */}
+        {/* 题号标签区域 */}
         <div style={{ width: "140px", fontWeight: "bold", fontSize: "18px"}}>
           {getDisplayName(item.questionCode)}
         </div>
 
-        {/* 输入 */}
+        {/* 正确题数输入框 */}
         <input
           style={{ width: "400px", height: "55px"}}
           type="number"
@@ -122,7 +152,7 @@ const [answers, setAnswers] = useState(
           onChange={(e) => updateAnswer(index, e.target.value)}
         />
 
-        {/* 删除 */}
+        {/* 删除本行按钮 */}
         <button
           className="btn btn-danger"
           style={{padding: "6px 12px", fontSize: "14px"}}
@@ -140,14 +170,14 @@ const [answers, setAnswers] = useState(
 
       <h4>输入 / 更新答案</h4>
 
-      {/* 词汇·阅读 */}
+      {/* 模块 A：词汇与阅读 */}
       <div className="mt-3">
         <h5>词汇·阅读</h5>
         <hr />
         {vocabReading.map(renderRow)}
       </div>
 
-      {/* 听力 */}
+      {/* 模块 B：听力 */}
       <div className="mt-3">
         <h5>听力</h5>
         <hr />
