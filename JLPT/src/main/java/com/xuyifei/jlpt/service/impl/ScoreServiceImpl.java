@@ -1,27 +1,25 @@
 package com.xuyifei.jlpt.service.impl;
 
-import com.xuyifei.jlpt.dto.QuestionAnswerDTO;
 import com.xuyifei.jlpt.entity.Exam;
 import com.xuyifei.jlpt.entity.ExamQuestionResult;
-import com.xuyifei.jlpt.entity.QuestionConfig;
 import com.xuyifei.jlpt.mapper.ExamMapper;
 import com.xuyifei.jlpt.mapper.ExamQuestionResultMapper;
 import com.xuyifei.jlpt.mapper.QuestionConfigMapper;
-import com.xuyifei.jlpt.mapper.ScoreConversionMapper;
 import com.xuyifei.jlpt.service.ScoreService;
 import com.xuyifei.jlpt.vo.ExamResultVO;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
+/**
+ * 分数计算服务实现类
+ * 负责解析答题记录、汇总各板块原始分、计算标准分及合格判定
+ */
 @Service
-@Transactional
+@Transactional // 类级别事务：确保计算分数和更新考试记录的操作原子性
 public class ScoreServiceImpl implements ScoreService {
 
     @Autowired
@@ -33,147 +31,24 @@ public class ScoreServiceImpl implements ScoreService {
     @Autowired
     private ExamQuestionResultMapper resultMapper;
 
-
-
-//    public ExamResultDTO calculateAndSaveScore(ExamSubmitDTO dto) {
-//
-//        // 1️⃣ 查询所有题目配置
-//        List<QuestionConfig> configs =
-//                questionConfigMapper.selectAll();
-//
-//        Map<String, QuestionConfig> configMap =
-//                configs.stream()
-//                        .collect(Collectors.toMap(
-//                                QuestionConfig::getQuestionCode,
-//                                c -> c
-//                        ));
-//
-//        int languageRaw = 0;
-//        int readingRaw = 0;
-//        int listeningRaw = 0;
-//
-//        List<ExamQuestionResult> resultList =
-//                new ArrayList<>();
-//
-//        // 2️⃣ 逐题计算
-//        for (QuestionAnswerDTO answer : dto.getAnswers()) {
-//
-//            QuestionConfig config =
-//                    configMap.get(answer.getQuestionCode());
-//
-//            if (config == null) {
-//                continue;
-//            }
-//
-//            int rawScore =
-//                    answer.getCorrectCount()
-//                            * config.getScorePerQuestion();
-//
-//            // 按板块累计
-//            String section =
-//                    config.getSectionType();
-//
-//            if ("LANGUAGE".equalsIgnoreCase(section)) {
-//                languageRaw += rawScore;
-//            } else if ("READING".equalsIgnoreCase(section)) {
-//                readingRaw += rawScore;
-//            } else if ("LISTENING".equalsIgnoreCase(section)) {
-//                listeningRaw += rawScore;
-//            }
-//
-//            // 保存明细
-//            ExamQuestionResult r =
-//                    new ExamQuestionResult();
-//
-//            r.setQuestionCode(answer.getQuestionCode());
-//            r.setCorrectCount(answer.getCorrectCount());
-//            r.setScorePerQuestion(config.getScorePerQuestion());
-//            r.setRawScore(rawScore);
-//            r.setSectionType(section);
-//
-//            resultList.add(r);
-//
-//        }
-//
-//        // 3️⃣ 转换成 60 分制
-//        // 3️⃣ 转换成 60 分制（比例换算）
-//
-//        Integer languageFull =
-//                questionConfigMapper.sumFullScoreBySection("language");
-//
-//        Integer readingFull =
-//                questionConfigMapper.sumFullScoreBySection("reading");
-//
-//        Integer listeningFull =
-//                questionConfigMapper.sumFullScoreBySection("listening");
-//
-//        int languageScore =
-//                calculateScaled(languageRaw, languageFull);
-//
-//        int readingScore =
-//                calculateScaled(readingRaw, readingFull);
-//
-//        int listeningScore =
-//                calculateScaled(listeningRaw, listeningFull);
-//
-//        int total =
-//                languageScore
-//                        + readingScore
-//                        + listeningScore;
-//
-//        // 4️⃣ 合格判定
-//        boolean pass =
-//                languageScore >= 19
-//                        && readingScore >= 19
-//                        && listeningScore >= 19
-//                        && total >= 90;
-//
-//        // 5️⃣ 保存 exam
-//        Exam exam = new Exam();
-//
-//        exam.setLevel(dto.getLevel());
-//        exam.setYear(dto.getYear());
-//        exam.setMonth(dto.getMonth());
-//
-//        // 保存 raw 分
-//        exam.setLanguageRawScore(languageRaw);
-//        exam.setReadingRawScore(readingRaw);
-//        exam.setListeningRawScore(listeningRaw);
-//
-//        exam.setLanguageScaledScore(languageScore);
-//        exam.setReadingScaledScore(readingScore);
-//        exam.setListeningScaledScore(listeningScore);
-//
-//        exam.setTotalScaledScore(total);
-//        exam.setPass(pass);
-//
-//        examMapper.insert(exam);
-//
-//        // 6️⃣ 绑定 examId
-//        for (ExamQuestionResult r : resultList) {
-//            r.setExamId(exam.getId());
-//        }
-//
-//        resultMapper.batchInsert(resultList);
-//        return new ExamResultDTO(
-//                languageScore,
-//                readingScore,
-//                listeningScore,
-//                total,
-//                pass
-//        );
-//    }
-
+    /**
+     * 计算整场考试的最终结果
+     * @param examId 考试记录 ID
+     * @return 包含最终得分和判定结果的视图对象 (VO)
+     */
     @Override
     public ExamResultVO calculate(Long examId) {
 
+        // 1. 获取该场考试所有的题目得分明细
         List<ExamQuestionResult> results =
                 resultMapper.selectByExamId(examId);
 
-        int languageRaw = 0;
-        int readingRaw = 0;
-        int listeningRaw = 0;
+        // 初始化三大板块的原始分累加器
+        int languageRaw = 0;    // 语言知识 (文字、词汇、语法)
+        int readingRaw = 0;     //阅读
+        int listeningRaw = 0;   //听力
 
+        // 2. 遍历明细，根据 sectionType 汇总各板块的原始得分
         for (ExamQuestionResult r : results) {
 
             if ("LANGUAGE".equalsIgnoreCase(r.getSectionType())) {
@@ -185,6 +60,7 @@ public class ScoreServiceImpl implements ScoreService {
             }
         }
 
+        // 3. 从配置表中获取各板块的满分值（原始分上限）
         Integer languageFull =
                 configMapper.sumFullScoreBySection("LANGUAGE");
 
@@ -194,6 +70,7 @@ public class ScoreServiceImpl implements ScoreService {
         Integer listeningFull =
                 configMapper.sumFullScoreBySection("LISTENING");
 
+        // 4. 将原始分折算为标准分 (Scaled Score，每项满分 60)
         int languageScaled =
                 calculateScaled(languageRaw, languageFull);
 
@@ -203,16 +80,19 @@ public class ScoreServiceImpl implements ScoreService {
         int listeningScaled =
                 calculateScaled(listeningRaw, listeningFull);
 
+        // 计算总分 (满分 180)
         int total =
                 languageScaled + readingScaled + listeningScaled;
 
+        // 5. 合格判定逻辑 (以 N1/N2 等级常见标准为例)
+        // 条件：各单项不低于 19 分，且总分不低于 90 分
         boolean pass =
                 languageScaled >= 19
                         && readingScaled >= 19
                         && listeningScaled >= 19
                         && total >= 90;
 
-        // 更新 exam
+        // 6. 更新 Exam 主表信息，持久化评分结果
         Exam exam = examMapper.selectById(examId);
 
         exam.setLanguageRawScore(languageRaw);
@@ -227,6 +107,7 @@ public class ScoreServiceImpl implements ScoreService {
 
         examMapper.updateById(exam);
 
+        // 7. 封装返回给前端的结果对象
         ExamResultVO vo = new ExamResultVO();
         vo.setLanguageScore(languageScaled);
         vo.setReadingScore(readingScaled);
@@ -237,24 +118,21 @@ public class ScoreServiceImpl implements ScoreService {
         return vo;
     }
 
+    /**
+     * 内部辅助方法：标准分折算算法
+     * 逻辑：(个人原始分 / 该项总原始分) * 60 分，并四舍五入
+     * @param raw 个人原始得分
+     * @param fullScore 该板块原始分满分
+     * @return 转换后的标准分 (0-60)
+     */
     private int calculateScaled(int raw, int fullScore) {
 
-
-
+        // 使用 double 运算防止整数除法导致精度丢失
         double ratio = (double) raw / fullScore;
 
+        // 四舍五入后转回 int
         return (int) Math.round(ratio * 60);
     }
 
-    /**
-     * Excel算分转换（先用简化版）
-     */
-    private int convertTo60(int raw) {
 
-        if (raw >= 60) {
-            return 60;
-        }
-
-        return raw;
-    }
 }

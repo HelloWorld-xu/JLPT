@@ -1,161 +1,38 @@
 package com.xuyifei.jlpt.entity;
 
 import java.time.LocalDateTime;
-
+import lombok.Data;
+/**
+ * 考试记录实体类
+ * 映射数据库中的考试表，存储单次考试的所有核心数据、各板块得分及最终判定结果
+ */
+@Data
 public class Exam {
 
-    private Long id;
-    private String level;
-    private Integer year;
-    private Integer month;
-    private String SectionType;
+    // ===== 基础信息 =====
+    private Long id;              // 唯一标识 ID
+    private String level;         // 考试等级 (N1-N3)
+    private Integer year;         // 考试年份
+    private Integer month;        // 考试月份
+    private String SectionType;   // 当前处理的板块类型
+    private Integer StandardScore;// 基准分/标准参考分
 
-    private Integer StandardScore;
+    // ===== 原始分 (Raw Score) =====
+    // 指的是用户直接答对的题目数量或简单累加分
+    private Integer languageRawScore; // 语言知识板块原始分
+    private Integer readingRawScore;  // 阅读板块原始分
+    private Integer listeningRawScore;// 听力板块原始分
+    private Integer RawScore;         // 总原始分
 
-    public Integer getStandardScore() {
-        return StandardScore;
-    }
+    // ===== 标准分 (Scaled Score) =====
+    // JLPT 官方采用项目反应理论 (IRT) 计算的分数，这里对应转换后的分值 (每项 0-60)
+    private Integer languageScaledScore; // 语言知识板块标准分
+    private Integer readingScaledScore;  // 阅读板块标准分
+    private Integer listeningScaledScore;// 听力板块标准分
 
-    public void setStandardScore(Integer standardScore) {
-        StandardScore = standardScore;
-    }
+    // ===== 判定与汇总 =====
+    private Integer totalScaledScore;// 总标准分 (0-180)
+    private Boolean pass;            // 是否合格 (合格判定结果)
+    private LocalDateTime createTime;// 记录创建时间/考试时间
 
-    public String getSectionType() {
-        return SectionType;
-    }
-
-    public void setSectionType(String sectionType) {
-        SectionType = sectionType;
-    }
-
-    // ===== 原始分 =====
-    private Integer languageRawScore;
-    private Integer readingRawScore;
-    private Integer listeningRawScore;
-    private Integer RawScore;
-
-    public Integer getRawScore() {
-        return RawScore;
-    }
-
-    public void setRawScore(Integer rawScore) {
-        RawScore = rawScore;
-    }
-
-    // ===== 标准分 =====
-    private Integer languageScaledScore;
-    private Integer readingScaledScore;
-    private Integer listeningScaledScore;
-
-    // ===== 汇总 =====
-    private Integer totalScaledScore;
-    private Boolean pass;
-
-    private LocalDateTime createTime;
-
-    // ===== Getter / Setter =====
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getLevel() {
-        return level;
-    }
-
-    public void setLevel(String level) {
-        this.level = level;
-    }
-
-    public Integer getYear() {
-        return year;
-    }
-
-    public void setYear(Integer year) {
-        this.year = year;
-    }
-
-    public Integer getMonth() {
-        return month;
-    }
-
-    public void setMonth(Integer month) {
-        this.month = month;
-    }
-
-    public Integer getLanguageRawScore() {
-        return languageRawScore;
-    }
-
-    public void setLanguageRawScore(Integer languageRawScore) {
-        this.languageRawScore = languageRawScore;
-    }
-
-    public Integer getReadingRawScore() {
-        return readingRawScore;
-    }
-
-    public void setReadingRawScore(Integer readingRawScore) {
-        this.readingRawScore = readingRawScore;
-    }
-
-    public Integer getListeningRawScore() {
-        return listeningRawScore;
-    }
-
-    public void setListeningRawScore(Integer listeningRawScore) {
-        this.listeningRawScore = listeningRawScore;
-    }
-
-    public Integer getLanguageScaledScore() {
-        return languageScaledScore;
-    }
-
-    public void setLanguageScaledScore(Integer languageScaledScore) {
-        this.languageScaledScore = languageScaledScore;
-    }
-
-    public Integer getReadingScaledScore() {
-        return readingScaledScore;
-    }
-
-    public void setReadingScaledScore(Integer readingScaledScore) {
-        this.readingScaledScore = readingScaledScore;
-    }
-
-    public Integer getListeningScaledScore() {
-        return listeningScaledScore;
-    }
-
-    public void setListeningScaledScore(Integer listeningScaledScore) {
-        this.listeningScaledScore = listeningScaledScore;
-    }
-
-    public Integer getTotalScaledScore() {
-        return totalScaledScore;
-    }
-
-    public void setTotalScaledScore(Integer totalScaledScore) {
-        this.totalScaledScore = totalScaledScore;
-    }
-
-    public Boolean getPass() {
-        return pass;
-    }
-
-    public void setPass(Boolean pass) {
-        this.pass = pass;
-    }
-
-    public LocalDateTime getCreateTime() {
-        return createTime;
-    }
-
-    public void setCreateTime(LocalDateTime createTime) {
-        this.createTime = createTime;
-    }
 }
