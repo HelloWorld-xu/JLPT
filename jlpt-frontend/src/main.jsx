@@ -3,6 +3,7 @@ import App from './App.jsx'    // 引入主应用组件（主页）
 import 'bootstrap/dist/css/bootstrap.min.css' // 引入 Bootstrap 样式库，提供快速 UI 布局
 import ReactDOM from "react-dom/client";      // 引入 React 18 的渲染引擎
 import HistoryPage from "./pages/HistoryPage"; // 引入历史记录页面组件
+import StatisticsPage from "./pages/StatisticsPage"; // 引入成绩分析页面组件
 import { BrowserRouter, Routes, Route } from "react-router-dom"; // 引入路由核心组件
 
 /**
@@ -25,6 +26,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
       {/* 历史路径: 展示用户过去所有的考试记录列表 */}
       <Route path="/history" element={<HistoryPage />} />
+
+      {/* 成绩分析页面：N1、N2、N3 分等级展示历史统计 */}
+      <Route path="/statistics" element={<StatisticsPage />} />
 
     </Routes>
   </BrowserRouter>
