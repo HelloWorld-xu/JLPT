@@ -19,7 +19,7 @@ import java.util.List;
  * 负责解析答题记录、汇总各板块原始分、计算标准分及合格判定
  */
 @Service
-@Transactional // 类级别事务：确保计算分数和更新考试记录的操作原子性
+@Transactional
 public class ScoreServiceImpl implements ScoreService {
 
     @Autowired
@@ -39,62 +39,80 @@ public class ScoreServiceImpl implements ScoreService {
     @Override
     public ExamResultVO calculate(Long examId) {
 
-        // 1. 获取该场考试所有的题目得分明细
+        // 1. 获取考试记录，后续所有配置均以该考试等级为准
+        Exam exam = examMapper.selectById(examId);
+        if (exam == null) {
+            throw new RuntimeException("考试记录不存在");
+        }
+
+        String level = exam.getLevel();
+
+        // 2. 获取该场考试所有的题目得分明细
         List<ExamQuestionResult> results =
                 resultMapper.selectByExamId(examId);
 
         // 初始化三大板块的原始分累加器
-        int languageRaw = 0;    // 语言知识 (文字、词汇、语法)
-        int readingRaw = 0;     //阅读
-        int listeningRaw = 0;   //听力
+        int languageRaw = 0;
+        int readingRaw = 0;
+        int listeningRaw = 0;
 
-        // 2. 遍历明细，根据 sectionType 汇总各板块的原始得分
+        // 3. 遍历明细，根据 sectionType 汇总各板块的原始得分
         for (ExamQuestionResult r : results) {
 
-            if ("LANGUAGE".equalsIgnoreCase(r.getSectionType())) {
+            if ("language".equalsIgnoreCase(r.getSectionType())) {
                 languageRaw += r.getRawScore();
-            } else if ("READING".equalsIgnoreCase(r.getSectionType())) {
+            } else if ("reading".equalsIgnoreCase(r.getSectionType())) {
                 readingRaw += r.getRawScore();
-            } else if ("LISTENING".equalsIgnoreCase(r.getSectionType())) {
+            } else if ("listening".equalsIgnoreCase(r.getSectionType())) {
                 listeningRaw += r.getRawScore();
             }
         }
 
-        // 3. 从配置表中获取各板块的满分值（原始分上限）
+        // 4. 按当前考试等级获取各板块的原始分满分
         Integer languageFull =
-                configMapper.sumFullScoreBySection("LANGUAGE");
+                configMapper.sumFullScoreBySection(level, "language");
 
         Integer readingFull =
-                configMapper.sumFullScoreBySection("READING");
+                configMapper.sumFullScoreBySection(level, "reading");
 
         Integer listeningFull =
-                configMapper.sumFullScoreBySection("LISTENING");
+                configMapper.sumFullScoreBySection(level, "listening");
 
-        // 4. 将原始分折算为标准分 (Scaled Score，每项满分 60)
-        int languageScaled =
-                calculateScaled(languageRaw, languageFull);
+        if (languageFull == null || languageFull <= 0
+                || readingFull == null || readingFull <= 0
+                || listeningFull == null || listeningFull <= 0) {
+            throw new RuntimeException("未找到 " + level + " 等级完整的分值配置");
+        }
 
-        int readingScaled =
-                calculateScaled(readingRaw, readingFull);
-
-        int listeningScaled =
-                calculateScaled(listeningRaw, listeningFull);
+        // 5. 将原始分折算为标准分 (每项满分 60)
+        int languageScaled = calculateScaled(languageRaw, languageFull);
+        int readingScaled = calculateScaled(readingRaw, readingFull);
+        int listeningScaled = calculateScaled(listeningRaw, listeningFull);
 
         // 计算总分 (满分 180)
-        int total =
-                languageScaled + readingScaled + listeningScaled;
+        int total = languageScaled + readingScaled + listeningScaled;
 
-        // 5. 合格判定逻辑 (以 N1/N2 等级常见标准为例)
-        // 条件：各单项不低于 19 分，且总分不低于 90 分
+        // 6. 根据考试等级设置总分合格线
+        int totalPassScore;
+        if ("N1".equalsIgnoreCase(level)) {
+            totalPassScore = 100;
+        } else if ("N2".equalsIgnoreCase(level)) {
+            // 保留原有 N2 的合格线
+            totalPassScore = 90;
+        } else if ("N3".equalsIgnoreCase(level)) {
+            totalPassScore = 95;
+        } else {
+            throw new RuntimeException("暂不支持的 JLPT 等级：" + level);
+        }
+
+        // 合格条件：三个单项均不低于 19 分，且总分达到等级要求
         boolean pass =
                 languageScaled >= 19
                         && readingScaled >= 19
                         && listeningScaled >= 19
-                        && total >= 90;
+                        && total >= totalPassScore;
 
-        // 6. 更新 Exam 主表信息，持久化评分结果
-        Exam exam = examMapper.selectById(examId);
-
+        // 7. 更新 Exam 主表信息，持久化评分结果
         exam.setLanguageRawScore(languageRaw);
         exam.setReadingRawScore(readingRaw);
         exam.setListeningRawScore(listeningRaw);
@@ -107,7 +125,7 @@ public class ScoreServiceImpl implements ScoreService {
 
         examMapper.updateById(exam);
 
-        // 7. 封装返回给前端的结果对象
+        // 8. 封装返回给前端的结果对象
         ExamResultVO vo = new ExamResultVO();
         vo.setLanguageScore(languageScaled);
         vo.setReadingScore(readingScaled);
@@ -119,20 +137,11 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     /**
-     * 内部辅助方法：标准分折算算法
-     * 逻辑：(个人原始分 / 该项总原始分) * 60 分，并四舍五入
-     * @param raw 个人原始得分
-     * @param fullScore 该板块原始分满分
-     * @return 转换后的标准分 (0-60)
+     * 标准分折算算法：
+     * (个人原始分 / 该项原始分满分) * 60 分，并四舍五入
      */
     private int calculateScaled(int raw, int fullScore) {
-
-        // 使用 double 运算防止整数除法导致精度丢失
         double ratio = (double) raw / fullScore;
-
-        // 四舍五入后转回 int
         return (int) Math.round(ratio * 60);
     }
-
-
 }
