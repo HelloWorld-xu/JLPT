@@ -2,7 +2,8 @@ package com.xuyifei.jlpt.controller;
 
 import com.xuyifei.jlpt.dto.CreateExamDTO;
 import com.xuyifei.jlpt.dto.QuestionAnswerDTO;
-import com.xuyifei.jlpt.entity.Exam;\nimport com.xuyifei.jlpt.entity.ExamQuestionResult;
+import com.xuyifei.jlpt.entity.Exam;
+import com.xuyifei.jlpt.entity.ExamQuestionResult;
 import com.xuyifei.jlpt.entity.QuestionConfig;
 import com.xuyifei.jlpt.service.ExamService;
 import com.xuyifei.jlpt.service.ScoreService;
@@ -70,6 +71,14 @@ public class ExamController {
     @PostMapping("/{id}/calculate")
     public ExamResultVO calculate(@PathVariable Long id) {
         return scoreService.calculate(id);
+    }
+
+    /**
+     * 获取指定考试已保存的各题型答题明细
+     */
+    @GetMapping("/{id}/answers")
+    public List<ExamQuestionResult> getExamAnswers(@PathVariable Long id) {
+        return examService.getAnswerDetails(id);
     }
 
     /**
