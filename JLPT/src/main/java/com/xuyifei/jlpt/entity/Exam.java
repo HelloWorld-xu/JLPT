@@ -33,6 +33,7 @@ public class Exam {
     // ===== 判定与汇总 =====
     private Integer totalScaledScore;// 总标准分 (0-180)
     private Boolean pass;            // 是否合格 (合格判定结果)
+    private Boolean calculated;       // 是否已经完成成绩计算
     private LocalDateTime createTime;// 记录创建时间/考试时间
 
 }
