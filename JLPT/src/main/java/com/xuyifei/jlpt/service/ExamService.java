@@ -2,7 +2,8 @@ package com.xuyifei.jlpt.service;
 
 import com.xuyifei.jlpt.dto.CreateExamDTO;
 import com.xuyifei.jlpt.dto.QuestionAnswerDTO;
-import com.xuyifei.jlpt.entity.Exam;\nimport com.xuyifei.jlpt.entity.ExamQuestionResult;
+import com.xuyifei.jlpt.entity.Exam;
+import com.xuyifei.jlpt.entity.ExamQuestionResult;
 import com.xuyifei.jlpt.entity.QuestionConfig;
 
 import java.util.List;
@@ -26,6 +27,11 @@ public interface ExamService {
      * 更新或插入答题记录
      */
     void upsertAnswers(Long examId, List<QuestionAnswerDTO> answers);
+
+    /**
+     * 根据考试 ID 获取已保存的答题明细
+     */
+    List<ExamQuestionResult> getAnswerDetails(Long examId);
 
     /**
      * 删除考试记录及其答题明细
