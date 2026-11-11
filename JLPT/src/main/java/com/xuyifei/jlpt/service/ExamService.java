@@ -5,6 +5,7 @@ import com.xuyifei.jlpt.dto.QuestionAnswerDTO;
 import com.xuyifei.jlpt.entity.Exam;
 import com.xuyifei.jlpt.entity.ExamQuestionResult;
 import com.xuyifei.jlpt.entity.QuestionConfig;
+import com.xuyifei.jlpt.vo.ExamStatisticsVO;
 
 import java.util.List;
 
@@ -47,4 +48,7 @@ public interface ExamService {
      * 获取所有考试记录
      */
     List<Exam> getAll();
+
+    /** 获取指定等级已计算考试的历史统计 */
+    ExamStatisticsVO getStatistics(String level);
 }
