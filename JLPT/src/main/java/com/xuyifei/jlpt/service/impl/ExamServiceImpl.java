@@ -9,15 +9,20 @@ import com.xuyifei.jlpt.mapper.ExamMapper;
 import com.xuyifei.jlpt.mapper.ExamQuestionResultMapper;
 import com.xuyifei.jlpt.mapper.QuestionConfigMapper;
 import com.xuyifei.jlpt.service.ExamService;
+import com.xuyifei.jlpt.vo.ExamStatisticsVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 /**
  * 考试服务实现类
@@ -175,6 +180,7 @@ public class ExamServiceImpl implements ExamService {
         exam.setListeningScaledScore(0);
         exam.setTotalScaledScore(0);
         exam.setPass(false);
+        exam.setCalculated(false);
 
         examMapper.insert(exam);
         return exam.getId();
@@ -206,6 +212,139 @@ public class ExamServiceImpl implements ExamService {
         result.setSectionType(config.getSectionType());
         result.setRawScore(dto.getCorrectCount() * config.getScorePerQuestion());
         return result;
+    }
+
+    /**
+     * 统计指定等级已完成成绩计算的考试。
+     * 趋势按考试年月排序，同年月时再按创建时间和 ID 排序。
+     */
+    @Override
+    public ExamStatisticsVO getStatistics(String level) {
+        String normalizedLevel = normalizeLevel(level);
+
+        List<Exam> exams = getAll().stream()
+                .filter(exam -> normalizedLevel.equalsIgnoreCase(exam.getLevel()))
+                .filter(exam -> Boolean.TRUE.equals(exam.getCalculated()))
+                .sorted(Comparator
+                        .comparing(Exam::getYear, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(Exam::getMonth, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(Exam::getCreateTime, Comparator.nullsLast(java.time.LocalDateTime::compareTo))
+                        .thenComparing(Exam::getId, Comparator.nullsLast(Long::compareTo)))
+                .collect(Collectors.toList());
+
+        ExamStatisticsVO statistics = new ExamStatisticsVO();
+        statistics.setLevel(normalizedLevel);
+        statistics.setExamCount(exams.size());
+
+        int passCount = (int) exams.stream()
+                .filter(exam -> Boolean.TRUE.equals(exam.getPass()))
+                .count();
+        statistics.setPassCount(passCount);
+
+        if (exams.isEmpty()) {
+            statistics.setHighestScore(null);
+            statistics.setAverageScore(null);
+            statistics.setPassRate(BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP));
+            statistics.setTrend(new ArrayList<>());
+            statistics.setSectionExtremes(buildSectionExtremes(exams));
+            return statistics;
+        }
+
+        statistics.setHighestScore(exams.stream()
+                .map(Exam::getTotalScaledScore)
+                .filter(score -> score != null)
+                .max(Integer::compareTo)
+                .orElse(null));
+
+        double average = exams.stream()
+                .map(Exam::getTotalScaledScore)
+                .filter(score -> score != null)
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0);
+        statistics.setAverageScore(BigDecimal.valueOf(average)
+                .setScale(2, RoundingMode.HALF_UP));
+        statistics.setPassRate(BigDecimal.valueOf(passCount * 100.0 / exams.size())
+                .setScale(1, RoundingMode.HALF_UP));
+
+        List<ExamStatisticsVO.TrendItem> trend = new ArrayList<>();
+        for (Exam exam : exams) {
+            ExamStatisticsVO.TrendItem item = new ExamStatisticsVO.TrendItem();
+            item.setExamId(exam.getId());
+            item.setYear(exam.getYear());
+            item.setMonth(exam.getMonth());
+            item.setLabel(exam.getYear() + "." + String.format("%02d", exam.getMonth()));
+            item.setLanguageScore(exam.getLanguageScaledScore());
+            item.setReadingScore(exam.getReadingScaledScore());
+            item.setListeningScore(exam.getListeningScaledScore());
+            item.setTotalScore(exam.getTotalScaledScore());
+            item.setPass(exam.getPass());
+            trend.add(item);
+        }
+        statistics.setTrend(trend);
+        statistics.setSectionExtremes(buildSectionExtremes(exams));
+
+        if (exams.size() >= 2) {
+            Exam previous = exams.get(exams.size() - 2);
+            Exam current = exams.get(exams.size() - 1);
+            ExamStatisticsVO.RecentComparison comparison =
+                    new ExamStatisticsVO.RecentComparison();
+            comparison.setPreviousLabel(formatExamLabel(previous));
+            comparison.setCurrentLabel(formatExamLabel(current));
+
+            comparison.setPreviousLanguageScore(previous.getLanguageScaledScore());
+            comparison.setCurrentLanguageScore(current.getLanguageScaledScore());
+            comparison.setLanguageChange(scoreOrZero(current.getLanguageScaledScore())
+                    - scoreOrZero(previous.getLanguageScaledScore()));
+
+            comparison.setPreviousReadingScore(previous.getReadingScaledScore());
+            comparison.setCurrentReadingScore(current.getReadingScaledScore());
+            comparison.setReadingChange(scoreOrZero(current.getReadingScaledScore())
+                    - scoreOrZero(previous.getReadingScaledScore()));
+
+            comparison.setPreviousListeningScore(previous.getListeningScaledScore());
+            comparison.setCurrentListeningScore(current.getListeningScaledScore());
+            comparison.setListeningChange(scoreOrZero(current.getListeningScaledScore())
+                    - scoreOrZero(previous.getListeningScaledScore()));
+
+            comparison.setPreviousTotalScore(previous.getTotalScaledScore());
+            comparison.setCurrentTotalScore(current.getTotalScaledScore());
+            comparison.setTotalChange(scoreOrZero(current.getTotalScaledScore())
+                    - scoreOrZero(previous.getTotalScaledScore()));
+            statistics.setRecentComparison(comparison);
+        }
+
+        return statistics;
+    }
+
+    private ExamStatisticsVO.SectionExtremes buildSectionExtremes(List<Exam> exams) {
+        ExamStatisticsVO.SectionExtremes extremes =
+                new ExamStatisticsVO.SectionExtremes();
+        extremes.setLanguage(buildScoreRange(exams, Exam::getLanguageScaledScore));
+        extremes.setReading(buildScoreRange(exams, Exam::getReadingScaledScore));
+        extremes.setListening(buildScoreRange(exams, Exam::getListeningScaledScore));
+        return extremes;
+    }
+
+    private ExamStatisticsVO.ScoreRange buildScoreRange(
+            List<Exam> exams, Function<Exam, Integer> scoreGetter) {
+        List<Integer> scores = exams.stream()
+                .map(scoreGetter)
+                .filter(score -> score != null)
+                .collect(Collectors.toList());
+
+        ExamStatisticsVO.ScoreRange range = new ExamStatisticsVO.ScoreRange();
+        range.setHighest(scores.stream().max(Integer::compareTo).orElse(null));
+        range.setLowest(scores.stream().min(Integer::compareTo).orElse(null));
+        return range;
+    }
+
+    private int scoreOrZero(Integer score) {
+        return score == null ? 0 : score;
+    }
+
+    private String formatExamLabel(Exam exam) {
+        return exam.getYear() + "." + String.format("%02d", exam.getMonth());
     }
 
     private String normalizeLevel(String level) {
