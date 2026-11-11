@@ -2,7 +2,7 @@ package com.xuyifei.jlpt.service;
 
 import com.xuyifei.jlpt.dto.CreateExamDTO;
 import com.xuyifei.jlpt.dto.QuestionAnswerDTO;
-import com.xuyifei.jlpt.entity.Exam;
+import com.xuyifei.jlpt.entity.Exam;\nimport com.xuyifei.jlpt.entity.ExamQuestionResult;
 import com.xuyifei.jlpt.entity.QuestionConfig;
 
 import java.util.List;
