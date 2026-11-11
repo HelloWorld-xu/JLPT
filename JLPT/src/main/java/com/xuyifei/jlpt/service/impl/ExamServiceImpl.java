@@ -138,6 +138,10 @@ public class ExamServiceImpl implements ExamService {
         if (!insertList.isEmpty()) {
             resultMapper.batchInsert(insertList);
         }
+
+        // 答案发生变化后，旧成绩不再视为有效；重新计算后才参与统计
+        exam.setCalculated(false);
+        examMapper.updateById(exam);
     }
 
     /**
