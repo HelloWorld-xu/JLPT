@@ -5,18 +5,29 @@
 
 <mapper namespace="com.xuyifei.jlpt.mapper.QuestionConfigMapper">
 
-    <select id="selectAll" resultType="com.xuyifei.jlpt.entity.QuestionConfig">
+    <!-- 按考试等级读取题型配置，三个等级使用相同的题型处理逻辑 -->
+    <select id="selectByLevel"
+            resultType="com.xuyifei.jlpt.entity.QuestionConfig">
         SELECT
-        section_type,
-        question_code,
-        score_per_question
+            level AS level,
+            section_type AS sectionType,
+            question_code AS questionCode,
+            question_count AS questionCount,
+            score_per_question AS scorePerQuestion,
+            section_order AS sectionOrder
         FROM question_config
+        WHERE level = #{level}
+        ORDER BY
+            FIELD(section_type, 'language', 'reading', 'listening'),
+            section_order
     </select>
 
+    <!-- 满分必须同时按等级、板块过滤，不能把 N1/N2/N3 的配置累加在一起 -->
     <select id="sumFullScoreBySection" resultType="java.lang.Integer">
         SELECT SUM(question_count * score_per_question)
         FROM question_config
-        WHERE section_type = #{sectionType}
+        WHERE level = #{level}
+          AND section_type = #{sectionType}
     </select>
 
 </mapper>
