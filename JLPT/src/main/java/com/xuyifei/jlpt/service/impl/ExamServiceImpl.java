@@ -136,6 +136,18 @@ public class ExamServiceImpl implements ExamService {
     }
 
     /**
+     * 根据考试 ID 获取已保存的答题明细
+     */
+    @Override
+    public List<ExamQuestionResult> getAnswerDetails(Long examId) {
+        Exam exam = examMapper.selectById(examId);
+        if (exam == null) {
+            throw new RuntimeException("考试记录不存在");
+        }
+        return resultMapper.selectByExamId(examId);
+    }
+
+    /**
      * 创建新考试
      */
     @Override
