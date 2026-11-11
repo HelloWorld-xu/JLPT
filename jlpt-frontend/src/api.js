@@ -47,3 +47,14 @@ export async function getExam(id) {
   if (!res.ok) return null;
   return res.json();
 }
+
+
+// 获取指定考试已保存的各题型答题明细
+export async function getExamAnswers(examId) {
+  const res = await fetch(`${BASE_URL}/exam/${examId}/answers`);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || "获取已保存答案失败");
+  }
+  return res.json();
+}
