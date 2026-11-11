@@ -4,27 +4,38 @@ import lombok.Data;
 
 /**
  * 题目分值配置实体类
- * 用于定义考试中各板块、各题型的评分标准（权重配置）
+ * 用于定义不同 JLPT 等级中各板块、各题型的评分标准
  */
 @Data
 public class QuestionConfig {
 
     /**
-     * 板块类型
-     * 对应考试的大项，如：语言知识、阅读、听力
+     * 考试等级，例如 N1、N2、N3
+     */
+    private String level;
+
+    /**
+     * 板块类型：language、reading、listening
      */
     private String sectionType;
 
     /**
-     * 题目代码
-     * 对应具体的大题编号，例如：N1_Q1（N1级别问题1）
+     * 题目代码，例如 L1、R1、LS1
      */
     private String questionCode;
 
     /**
-     * 每题分值
-     * 在计算原始分（Raw Score）时，该题型下每答对一道题所占的分数权重
+     * 当前题型包含的题目数量
+     */
+    private Integer questionCount;
+
+    /**
+     * 每题原始分值
      */
     private Integer scorePerQuestion;
 
+    /**
+     * 当前题型在所属板块中的显示顺序
+     */
+    private Integer sectionOrder;
 }
