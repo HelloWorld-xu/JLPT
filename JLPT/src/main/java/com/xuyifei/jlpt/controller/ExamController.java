@@ -8,6 +8,7 @@ import com.xuyifei.jlpt.entity.QuestionConfig;
 import com.xuyifei.jlpt.service.ExamService;
 import com.xuyifei.jlpt.service.ScoreService;
 import com.xuyifei.jlpt.vo.ExamResultVO;
+import com.xuyifei.jlpt.vo.ExamStatisticsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -87,6 +88,15 @@ public class ExamController {
     @GetMapping("/{id}/get")
     public Exam getExamById(@PathVariable Long id) {
         return examService.getById(id);
+    }
+
+    /**
+     * 获取指定等级的历史成绩统计（仅统计已计算成绩的考试）
+     * GET /exam/statistics/N2
+     */
+    @GetMapping("/statistics/{level}")
+    public ExamStatisticsVO getStatistics(@PathVariable String level) {
+        return examService.getStatistics(level);
     }
 
     /**
