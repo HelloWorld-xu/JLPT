@@ -1,200 +1,193 @@
-import { useState } from "react";
-import { upsertAnswers, calculate } from "../api";
+import { useEffect, useState } from "react";
+import { calculate, getQuestionConfigs, upsertAnswers } from "../api";
+
+const SECTION_LABELS = {
+  language: "语言知识",
+  reading: "阅读",
+  listening: "听力",
+};
 
 /**
- * AnswerForm 组件：答题数据录入表单
- * 功能：提供针对不同题型的正确题数输入，支持保存进度（Upsert）和触发后端评分计算
+ * 根据当前考试等级，从后端读取题型配置并动态生成答题表单。
+ * N1、N2、N3 共用同一套录入和计算流程。
  */
-function AnswerForm({ examId, setResult }) {
-  
-  /**
-   * 题目列表常量
-   * L: Language Knowledge (词汇/语法)
-   * R: Reading (阅读)
-   * LS: Listening (听力)
-   */
-  const QUESTION_LIST = [
-    "L1","L2","L3","L4","L5","L6","L7","L8","L9",
-    "R1","R2","R3","R4","R5",
-    "LS1","LS2","LS3","LS4","LS5","LS6"
-  ];
+function AnswerForm({ examId, level, setResult }) {
+  const [configs, setConfigs] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  // 初始化状态：将题号列表映射为初始答案对象数组
-  const [answers, setAnswers] = useState(
-    QUESTION_LIST.map(code => ({
-      questionCode: code,
-      correctCount: "", // 正确题目数量
-      deleted: false    // 用于前端软删除该题的输入框
-    }))
-  );
+  useEffect(() => {
+    let cancelled = false;
 
-  /**
-   * 更新输入框内容
-   * @param {number} index - 在 answers 数组中的索引
-   * @param {string} value - 输入的数字字符串
-   */
-  const updateAnswer = (index, value) => {
-    const newAnswers = [...answers];
-    newAnswers[index].correctCount = value;
-    setAnswers(newAnswers);
+    async function loadConfigs() {
+      if (!level) return;
+      setLoading(true);
+      setError("");
+      setConfigs([]);
+      setAnswers({});
+
+      try {
+        const data = await getQuestionConfigs(level);
+        if (cancelled) return;
+
+        setConfigs(data);
+        // 每个题型单独保存正确题数，初始留空；提交时空值按 0 分处理
+        setAnswers(
+          Object.fromEntries(data.map((item) => [item.questionCode, ""]))
+        );
+      } catch (err) {
+        if (!cancelled) {
+          console.error(err);
+          setError(err.message || "题型配置加载失败");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadConfigs();
+    return () => {
+      cancelled = true;
+    };
+  }, [level, examId]);
+
+  const updateAnswer = (questionCode, value, max) => {
+    if (value !== "" && (!/^\d+$/.test(value) || Number(value) > max)) {
+      return;
+    }
+    setAnswers((previous) => ({
+      ...previous,
+      [questionCode]: value,
+    }));
   };
 
-  /**
-   * 软删除某一行（不显示该题目的输入框）
-   */
-  const deleteRow = (index) => {
-    const newAnswers = [...answers];
-    newAnswers[index].deleted = true;
-    setAnswers(newAnswers);
-  };
+  // 每次提交完整题型列表，空输入按 0 处理，避免清空输入后数据库仍保留旧分数
+  const buildPayload = () =>
+    configs.map((config) => ({
+      questionCode: config.questionCode,
+      correctCount: answers[config.questionCode] === ""
+        ? 0
+        : Number(answers[config.questionCode]),
+    }));
 
-  /**
-   * 提交答案（保存到数据库）
-   * 过滤掉已删除或未填写的项，并转换为后端需要的 DTO 格式
-   */
   const handleSubmit = async () => {
-    const validAnswers = answers
-      .filter(a => !a.deleted && a.correctCount !== "")
-      .map(a => ({
-        questionCode: a.questionCode,
-        correctCount: Number(a.correctCount)
-      }));
+    if (configs.length === 0) {
+      alert("题型配置尚未加载");
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      // 调用 API 执行新增或更新操作
-      await upsertAnswers(examId, validAnswers);
-      alert("提交成功");
-    } catch (e) {
-      console.error(e);
-      alert("提交失败");
+      await upsertAnswers(examId, buildPayload());
+      alert("答案保存成功");
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || err.message || "答案保存失败");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  /**
-   * 计算成绩
-   * 触发后端执行 IRT 算法或权重转换，并将返回的结果通过 setResult 更新父组件状态
-   */
+  // 计算前先保存当前表单，避免用户直接点击“计算成绩”时使用数据库中的旧答案
   const handleCalculate = async () => {
+    if (configs.length === 0) {
+      alert("题型配置尚未加载");
+      return;
+    }
+
+    setSubmitting(true);
     try {
+      await upsertAnswers(examId, buildPayload());
       const res = await calculate(examId);
       setResult(res.data);
     } catch (err) {
       console.error("计算失败", err);
+      alert(err.response?.data?.message || err.message || "计算失败，请检查后端服务");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  /**
-   * 格式化显示题号名称
-   * 将数据库简码（L1, R1...）转换为人类可读的 JLPT 试卷题号（问题1, 问题10...）
-   */
-  const getDisplayName = (code) => {
+  const groupedConfigs = ["language", "reading", "listening"].map((sectionType) => ({
+    sectionType,
+    items: configs
+      .filter((item) => item.sectionType?.toLowerCase() === sectionType)
+      .sort((a, b) => a.sectionOrder - b.sectionOrder),
+  }));
 
-    // 1. 处理听力 (LS)
-    if (code.startsWith("LS")) {
-      const num = Number(code.slice(2));
+  if (loading) {
+    return <div className="card p-3 mt-3">正在加载 {level} 题型配置……</div>;
+  }
 
-      if (num <= 4) return `问题${num}`;
-      if (num === 5) return "问题5（1）";
-      if (num === 6) return "问题5（2）";
-    }
-
-    // 2. 处理词汇/语法 (L)
-    if (code.startsWith("L")) {
-      return `问题${code.slice(1)}`;
-    }
-
-    // 3. 处理阅读 (R) - JLPT 阅读通常接在语法题之后
-    if (code.startsWith("R")) {
-      // 假设语法题到问题9结束，阅读从问题10开始
-      return `问题${Number(code.slice(1)) + 9}`;
-    }
-
-    return code;
-  };
-
-  /**
-   * 逻辑分组渲染
-   * 根据题号前缀，将表单拆分为“词汇·阅读”和“听力”两个视觉区域
-   */
-  const vocabReading = answers.filter(
-    a => (a.questionCode.startsWith("L") && !a.questionCode.startsWith("LS")) || a.questionCode.startsWith("R")
-  );
-
-  const listening = answers.filter(
-    a => a.questionCode.startsWith("LS")
-  );
-
-  /**
-   * 单行渲染函数
-   */
-  const renderRow = (item) => {
-    if (item.deleted) return null;
-
-    const index = answers.findIndex(a => a.questionCode === item.questionCode);
-
-    return (
-      <div key={item.questionCode} className="d-flex mb-3 align-items-center justify-content-center">
-
-        {/* 题号标签区域 */}
-        <div style={{ width: "140px", fontWeight: "bold", fontSize: "18px"}}>
-          {getDisplayName(item.questionCode)}
-        </div>
-
-        {/* 正确题数输入框 */}
-        <input
-          style={{ width: "400px", height: "55px"}}
-          type="number"
-          min={0}
-          max={12}
-          className="form-control me-2"
-          value={item.correctCount}
-          placeholder="正确数"
-          onChange={(e) => updateAnswer(index, e.target.value)}
-        />
-
-        {/* 删除本行按钮 */}
-        <button
-          className="btn btn-danger"
-          style={{padding: "6px 12px", fontSize: "14px"}}
-          onClick={() => deleteRow(index)}
-        >
-          删除
-        </button>
-
-      </div>
-    );
-  };
+  if (error) {
+    return <div className="alert alert-danger mt-3">{error}</div>;
+  }
 
   return (
-     <div className="card p-3 mt-3">
+    <div className="card p-3 mt-3">
+      <h4>输入 / 更新答案（{level}）</h4>
 
-      <h4>输入 / 更新答案</h4>
+      {groupedConfigs.map(({ sectionType, items }) =>
+        items.length > 0 ? (
+          <div className="mt-3" key={sectionType}>
+            <h5>{SECTION_LABELS[sectionType]}</h5>
+            <hr />
+            {items.map((item) => (
+              <div
+                key={item.questionCode}
+                className="d-flex mb-3 align-items-center flex-wrap"
+              >
+                <div style={{ width: "190px", fontWeight: "bold" }}>
+                  题型 {item.sectionOrder}（{item.questionCode}）
+                </div>
 
-      {/* 模块 A：词汇与阅读 */}
+                <input
+                  style={{ width: "220px", maxWidth: "100%" }}
+                  type="number"
+                  min={0}
+                  max={item.questionCount}
+                  step={1}
+                  inputMode="numeric"
+                  className="form-control me-3"
+                  value={answers[item.questionCode] ?? ""}
+                  placeholder={`0 - ${item.questionCount}`}
+                  onChange={(e) =>
+                    updateAnswer(
+                      item.questionCode,
+                      e.target.value,
+                      item.questionCount
+                    )
+                  }
+                />
+
+                <small className="text-muted">
+                  共 {item.questionCount} 题，每题 {item.scorePerQuestion} 分
+                </small>
+              </div>
+            ))}
+          </div>
+        ) : null
+      )}
+
       <div className="mt-3">
-        <h5>词汇·阅读</h5>
-        <hr />
-        {vocabReading.map(renderRow)}
-      </div>
-
-      {/* 模块 B：听力 */}
-      <div className="mt-3">
-        <h5>听力</h5>
-        <hr />
-        {listening.map(renderRow)}
-      </div>
-
-      {/* 操作按钮 */}
-      <div className="mt-3">
-        <button className="btn btn-success me-2" onClick={handleSubmit}>
-          保存
+        <button
+          className="btn btn-success me-2"
+          onClick={handleSubmit}
+          disabled={submitting || configs.length === 0}
+        >
+          {submitting ? "处理中…" : "保存"}
         </button>
 
-        <button className="btn btn-warning" onClick={handleCalculate}>
-          计算成绩
+        <button
+          className="btn btn-warning"
+          onClick={handleCalculate}
+          disabled={submitting || configs.length === 0}
+        >
+          {submitting ? "处理中…" : "保存并计算成绩"}
         </button>
       </div>
-
     </div>
   );
 }
