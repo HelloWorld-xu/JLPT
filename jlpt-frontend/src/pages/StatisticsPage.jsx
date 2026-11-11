@@ -134,11 +134,6 @@ function LineChart({ title, subtitle, data, series, maxValue }) {
   );
 }
 
-function ScoreRange({ range }) {
-  if (!range || range.highest === null || range.lowest === null) return "--";
-  return <>{range.highest} / {range.lowest}</>;
-}
-
 function StatisticsPage() {
   const navigate = useNavigate();
   const [level, setLevel] = useState("N2");
