@@ -1,0 +1,55 @@
+.stats-page {
+  text-align: left;
+}
+
+.stats-card {
+  border-radius: 12px;
+}
+
+.stats-kpi {
+  border-radius: 12px;
+  min-height: 132px;
+}
+
+.stats-kpi-value {
+  color: #212529;
+  font-size: clamp(1.7rem, 3vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 7px 0 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.stats-chart-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.stats-chart {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+.stats-page .table {
+  font-size: 0.94rem;
+}
+
+@media (max-width: 576px) {
+  .stats-page {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .stats-chart {
+    min-width: 480px;
+  }
+}
