@@ -73,7 +73,7 @@ function AnswerForm({ examId, level, setResult }) {
   }, [level, examId]);
 
   const updateAnswer = (questionCode, value, max) => {
-    if (value !== "" && (!/^\\d+$/.test(value) || Number(value) > max)) {
+    if (value !== "" && (!/^\d+$/.test(value) || Number(value) > max)) {
       return;
     }
     setAnswers((previous) => ({
