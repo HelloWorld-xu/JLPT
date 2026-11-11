@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { calculate, getQuestionConfigs, upsertAnswers } from "../api";
+import {
+  calculate,
+  getExamAnswers,
+  getQuestionConfigs,
+  upsertAnswers,
+} from "../api";
 
 const SECTION_LABELS = {
   language: "语言知识",
@@ -8,7 +13,7 @@ const SECTION_LABELS = {
 };
 
 /**
- * 根据当前考试等级，从后端读取题型配置并动态生成答题表单。
+ * 根据考试等级加载题型配置，并回显该场考试已经保存的小题分数。
  * N1、N2、N3 共用同一套录入和计算流程。
  */
 function AnswerForm({ examId, level, setResult }) {
@@ -21,40 +26,54 @@ function AnswerForm({ examId, level, setResult }) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadConfigs() {
-      if (!level) return;
+    async function loadFormData() {
+      if (!level || !examId) return;
+
       setLoading(true);
       setError("");
       setConfigs([]);
       setAnswers({});
 
       try {
-        const data = await getQuestionConfigs(level);
+        // 同时读取当前等级的题型配置和该场考试已保存的答题明细
+        const [configData, savedAnswers] = await Promise.all([
+          getQuestionConfigs(level),
+          getExamAnswers(examId),
+        ]);
+
         if (cancelled) return;
 
-        setConfigs(data);
-        // 每个题型单独保存正确题数，初始留空；提交时空值按 0 分处理
-        setAnswers(
-          Object.fromEntries(data.map((item) => [item.questionCode, ""]))
+        // 先将所有题型初始化为空，再用数据库中已有的正确题数回填
+        const answerMap = Object.fromEntries(
+          configData.map((item) => [item.questionCode, ""])
         );
+
+        savedAnswers.forEach((item) => {
+          if (Object.prototype.hasOwnProperty.call(answerMap, item.questionCode)) {
+            answerMap[item.questionCode] = String(item.correctCount ?? 0);
+          }
+        });
+
+        setConfigs(configData);
+        setAnswers(answerMap);
       } catch (err) {
         if (!cancelled) {
           console.error(err);
-          setError(err.message || "题型配置加载失败");
+          setError(err.message || "考试题型或已保存答案加载失败");
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    loadConfigs();
+    loadFormData();
     return () => {
       cancelled = true;
     };
   }, [level, examId]);
 
   const updateAnswer = (questionCode, value, max) => {
-    if (value !== "" && (!/^\d+$/.test(value) || Number(value) > max)) {
+    if (value !== "" && (!/^\\d+$/.test(value) || Number(value) > max)) {
       return;
     }
     setAnswers((previous) => ({
@@ -63,8 +82,8 @@ function AnswerForm({ examId, level, setResult }) {
     }));
   };
 
-  // 只提交本次明确填写的题型，避免表单初始空白把数据库中已有答案覆盖成 0。
-  // 如果需要把某题清零，请明确输入 0。
+  // 只提交明确填写的题型，空白题型不会覆盖数据库中已有答案。
+  // 若要将某题型清零，请明确输入 0。
   const buildPayload = () =>
     configs
       .filter((config) => answers[config.questionCode] !== "")
@@ -97,7 +116,6 @@ function AnswerForm({ examId, level, setResult }) {
     }
   };
 
-  // 计算前先保存当前表单，避免用户直接点击“计算成绩”时使用数据库中的旧答案
   const handleCalculate = async () => {
     if (configs.length === 0) {
       alert("题型配置尚未加载");
@@ -131,7 +149,7 @@ function AnswerForm({ examId, level, setResult }) {
   }));
 
   if (loading) {
-    return <div className="card p-3 mt-3">正在加载 {level} 题型配置……</div>;
+    return <div className="card p-3 mt-3">正在加载 {level} 题型配置和已保存答案……</div>;
   }
 
   if (error) {
