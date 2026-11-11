@@ -22,7 +22,7 @@ function ChangeValue({ value }) {
 }
 
 function LineChart({ title, subtitle, data, series, maxValue }) {
-  const width = 760;
+  const width = Math.max(760, data.length * 90 + 70);
   const height = 280;
   const left = 48;
   const right = 22;
@@ -56,6 +56,7 @@ function LineChart({ title, subtitle, data, series, maxValue }) {
         <div className="stats-chart-scroll">
           <svg
             className="stats-chart"
+            style={{ minWidth: `${width}px` }}
             viewBox={`0 0 ${width} ${height}`}
             role="img"
             aria-label={title}
