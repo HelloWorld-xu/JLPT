@@ -134,12 +134,20 @@ function App() {
         <div className="text-danger mt-2">该考试不存在，请先创建</div>
       )}
 
-      <button
-        className="btn btn-info mb-3"
-        onClick={() => navigate("/history")}
-      >
-        查看历史成绩
-      </button>
+      <div className="d-flex flex-wrap gap-2 mb-3">
+        <button
+          className="btn btn-info"
+          onClick={() => navigate("/history")}
+        >
+          查看历史成绩
+        </button>
+        <button
+          className="btn btn-success"
+          onClick={() => navigate("/statistics")}
+        >
+          成绩分析
+        </button>
+      </div>
     </div>
   );
 }
