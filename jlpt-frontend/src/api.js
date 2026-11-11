@@ -58,3 +58,13 @@ export async function getExamAnswers(examId) {
   }
   return res.json();
 }
+
+// 获取指定等级的历史成绩统计（仅统计已计算成绩的考试）
+export async function getExamStatistics(level) {
+  const res = await fetch(`${BASE_URL}/exam/statistics/${encodeURIComponent(level)}`);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || "获取成绩统计失败");
+  }
+  return res.json();
+}
