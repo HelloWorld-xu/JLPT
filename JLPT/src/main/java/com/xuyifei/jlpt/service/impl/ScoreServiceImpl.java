@@ -117,6 +117,7 @@ public class ScoreServiceImpl implements ScoreService {
         exam.setListeningScaledScore(listeningScaled);
         exam.setTotalScaledScore(total);
         exam.setPass(pass);
+        exam.setCalculated(true);
 
         examMapper.updateById(exam);
 
