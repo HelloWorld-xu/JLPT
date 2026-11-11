@@ -63,14 +63,15 @@ function AnswerForm({ examId, level, setResult }) {
     }));
   };
 
-  // 每次提交完整题型列表，空输入按 0 处理，避免清空输入后数据库仍保留旧分数
+  // 只提交本次明确填写的题型，避免表单初始空白把数据库中已有答案覆盖成 0。
+  // 如果需要把某题清零，请明确输入 0。
   const buildPayload = () =>
-    configs.map((config) => ({
-      questionCode: config.questionCode,
-      correctCount: answers[config.questionCode] === ""
-        ? 0
-        : Number(answers[config.questionCode]),
-    }));
+    configs
+      .filter((config) => answers[config.questionCode] !== "")
+      .map((config) => ({
+        questionCode: config.questionCode,
+        correctCount: Number(answers[config.questionCode]),
+      }));
 
   const handleSubmit = async () => {
     if (configs.length === 0) {
@@ -78,9 +79,15 @@ function AnswerForm({ examId, level, setResult }) {
       return;
     }
 
+    const payload = buildPayload();
+    if (payload.length === 0) {
+      alert("请至少填写一个题型的正确题数；需要清零的题型请填写 0");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await upsertAnswers(examId, buildPayload());
+      await upsertAnswers(examId, payload);
       alert("答案保存成功");
     } catch (err) {
       console.error(err);
@@ -97,9 +104,15 @@ function AnswerForm({ examId, level, setResult }) {
       return;
     }
 
+    const payload = buildPayload();
+    if (payload.length === 0) {
+      alert("请至少填写一个题型的正确题数；需要清零的题型请填写 0");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await upsertAnswers(examId, buildPayload());
+      await upsertAnswers(examId, payload);
       const res = await calculate(examId);
       setResult(res.data);
     } catch (err) {
