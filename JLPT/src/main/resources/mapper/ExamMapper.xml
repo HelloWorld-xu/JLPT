@@ -18,7 +18,8 @@
             listening_scaled_score,
 
             total_scaled_score,
-            pass
+            pass,
+            calculated
         ) VALUES (
                      #{level}, #{year}, #{month},
 
@@ -31,7 +32,8 @@
                      #{listeningScaledScore},
 
                      #{totalScaledScore},
-                     #{pass}
+                     #{pass},
+                     #{calculated}
                  )
     </insert>
 
@@ -48,7 +50,8 @@
             reading_scaled_score = #{readingScaledScore},
             listening_scaled_score = #{listeningScaledScore},
             total_scaled_score = #{totalScaledScore},
-            pass = #{pass}
+            pass = #{pass},
+            calculated = #{calculated}
         where id = #{id}
     </update>
     <delete id="deleteById">
